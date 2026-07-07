@@ -1,0 +1,38 @@
+# ── Private files — never published ─────────────────────────────
+# Convention: name it *.private.* (e.g. notes.private.md) or put it
+# in a private/ folder, and git will never push it.
+private/
+*.private.*
+*-private.*
+PRIVATE*
+
+# ── Credentials & secrets ────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*.token
+*credentials*
+*secret*
+inventory*.yaml
+inventory*.ini
+
+# ── Work-data safety net (labs are public; work stays sanitized) ─
+# Anything with a company name in the filename is blocked by default.
+# If a file is genuinely safe to publish, force it: git add -f <file>
+*telcotech*
+*ezecom*
+*cellcard*
+*metfone*
+
+# ── Junk ─────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+*.tmp
+*.bak

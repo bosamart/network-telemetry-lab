@@ -25,6 +25,7 @@ is a later swap; the configs are identical either way.
 | 2 | SNMP baseline on IOS-XR | 🟡 planned |
 | 3 | snmp_exporter → first real dashboard | 🟡 planned |
 | 3.5 | Cacti — the legacy stack at work (Telcotech/Ezecom/Cellcard run it) | 🟡 planned |
+| 3.8 | NetFlow → nfdump/NfSen — *who/what* fills the links | 🟡 planned |
 | 4 | gNMI on IOS-XR + gnmic exploration | 🟡 planned |
 | 5 | Streaming telemetry pipeline + core dashboards | 🟡 planned |
 | 6 | Alerting that matters (Alertmanager + break-tests) | 🟡 planned |
@@ -124,6 +125,20 @@ walk it from the Docker host with `snmpwalk`: find hostname (sysName), interface
 **Checkpoint:** why HC (64-bit) counters — what breaks with 32-bit at 10 Gbps? What does the
 mgmt ACL protect against?
 
+**Config sketch (per router):**
+
+```
+ipv4 access-list SNMP-HOSTS
+ 10 permit ipv4 host <docker-host-ip> any
+!
+snmp-server community lab RO IPv4 SNMP-HOSTS
+snmp-server location EVE-NG-diamond
+```
+
+On the host: `sudo apt install snmp snmp-mibs-downloader`, then
+`snmpwalk -v2c -c lab <R1-mgmt-ip> 1.3.6.1.2.1.2.2.1.2` (ifDescr by raw OID first — do it once
+the hard way — then by name after enabling MIBs).
+
 ## Phase 3 — snmp_exporter → first real dashboard *(planned)*
 
 **Objective:** add `snmp_exporter` to the compose file, scrape all four routers (if_mib module),
@@ -131,6 +146,34 @@ Grafana dashboard: per-interface traffic, errors, discards, oper-status.
 **Verify:** `up{job="snmp"}` == 1 for all routers; shut a link, watch oper-status drop on the
 panel.
 **Checkpoint:** the exporter pattern — why does Prometheus never speak SNMP itself?
+
+**Config sketch** — add to `docker-compose.yml`:
+
+```yaml
+  snmp-exporter:
+    image: prom/snmp-exporter:latest
+    ports: ["9116:9116"]
+```
+
+and to `prometheus.yml`:
+
+```yaml
+  - job_name: snmp
+    metrics_path: /snmp
+    params: { module: [if_mib], auth: [public_v2] }   # map auth to community 'lab'
+    static_configs:
+      - targets: [<R1-ip>, <R2-ip>, <R3-ip>, <R4-ip>]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp-exporter:9116
+```
+
+The relabel dance (router IP becomes a *parameter*, exporter becomes the scrape address) is the
+exporter pattern made visible — understand these 8 lines and you understand it.
 
 ## Phase 3.5 — Cacti: the legacy stack at work *(planned)*
 
@@ -149,6 +192,61 @@ under a ping flood; force a counter wrap discussion with a 32-bit vs 64-bit (HC)
 can Cacti never show a 10-second spike that Grafana/gNMI can? Which failure does *polling
 gap* hide?
 
+**Config sketch** — add to `docker-compose.yml` (verify image tag first, see HANDOFF):
+
+```yaml
+  cacti:
+    image: smcline06/cacti
+    ports: ["8080:80"]
+    environment: [DB_NAME=cacti, DB_USER=cacti, DB_PASS=lab123, DB_HOST=cacti-db]
+    volumes: [cacti_data:/cacti]
+  cacti-db:
+    image: mariadb:10.6
+    environment: [MYSQL_ROOT_PASSWORD=lab123, MYSQL_DATABASE=cacti,
+                  MYSQL_USER=cacti, MYSQL_PASSWORD=lab123]
+    volumes: [cacti_db:/var/lib/mysql]
+```
+
+Then in the UI (`localhost:8080`): Console → Create → New Device (SNMP v2, community `lab`) →
+attach *Interface Statistics* graph templates → add to a graph tree. Weathermap is installed as
+a Cacti plugin afterward.
+
+## Phase 3.8 — NetFlow: who and what is on the wire *(planned)*
+
+**Objective:** sampled NetFlow v9 export from the routers into **nfdump/nfcapd** on the Docker
+host (NfSen is the legacy web UI on top — same engine your NOC likely runs; modern equivalents:
+Akvorado, ElastiFlow). Generate distinct traffic streams between CEs and answer "what are the
+top talkers on R1–R2?" from flow data.
+**Why:** SNMP/Cacti say *how much*; flow says **who, to where, which port**. At work this is the
+"what is filling the cross-border link" tool — capacity, abuse, and billing questions all land
+here.
+
+**Config sketch (per router, ingress on core links):**
+
+```
+sampler-map SM-1K
+ random 1 out-of 1000
+!
+flow exporter-map FEM-HOST
+ version v9
+ transport udp 9995
+ destination <docker-host-ip>
+!
+flow monitor-map FMM-IPV4
+ record ipv4
+ exporter FEM-HOST
+!
+interface GigabitEthernet0/0/0/0
+ flow ipv4 monitor FMM-IPV4 sampler SM-1K ingress
+```
+
+Collector: `nfcapd -w -D -p 9995 -l /data/flows`, then `nfdump -R /data/flows -s ip/bytes -n 10`
+for top talkers (containerized or straight on WSL2).
+**Verify:** `show flow monitor-map` / `show flow exporter ... statistics` on XR; nfdump showing
+your test streams in the right proportions.
+**Checkpoint:** what does 1:1000 sampling do to small flows — when is sampled data *wrong* to
+bill or alert from? Why export ingress on every core link rather than everywhere?
+
 ## Phase 4 — gNMI on IOS-XR + gnmic *(planned)*
 
 **Objective:** `grpc` + gNMI on the routers; from the host use **gnmic** to `capabilities`,
@@ -157,6 +255,23 @@ no polling. First contact with YANG paths (`openconfig-interfaces`).
 **Verify:** a gnmic subscription printing counter updates live.
 **Checkpoint:** poll vs subscribe — what does streaming fix at 5000-device scale (hint: what
 did Phase 2's snmpwalk cost per poll)?
+
+**Config sketch** — router:
+
+```
+grpc
+ port 57400
+ no-tls          ! lab only — TLS once it works
+```
+
+Host (`gnmic` is a single binary):
+
+```bash
+gnmic -a <R1-ip>:57400 -u admin -p admin --insecure capabilities
+gnmic -a <R1-ip>:57400 -u admin -p admin --insecure \
+  subscribe --path "openconfig-interfaces:interfaces/interface/state/counters" \
+  --sample-interval 10s
+```
 
 ## Phase 5 — Streaming telemetry pipeline + core dashboards *(planned)*
 
@@ -168,6 +283,32 @@ Grafana wall.
 **Checkpoint:** trace one metric end-to-end: YANG leaf → gnmic → Prometheus metric+labels →
 PromQL query → panel.
 
+**Config sketch** — `gnmic-config.yml` (gnmic runs as a container, subscribes to all four,
+exposes Prometheus metrics):
+
+```yaml
+username: admin
+password: admin
+insecure: true
+targets:
+  <R1-ip>:57400: {}
+  <R2-ip>:57400: {}
+  <R3-ip>:57400: {}
+  <R4-ip>:57400: {}
+subscriptions:
+  counters:
+    paths: ["openconfig-interfaces:interfaces/interface/state/counters"]
+    sample-interval: 10s
+outputs:
+  prom:
+    type: prometheus
+    listen: ":9273"
+```
+
+Prometheus side: one plain scrape job pointing at `gnmic:9273`. BGP/IS-IS paths get added to
+`subscriptions` as you find the right YANG models (`gnmic ... get --path / --format flat` to
+explore).
+
 ## Phase 6 — Alerting that matters *(planned)*
 
 **Objective:** Alertmanager + rules for the few things worth waking for: BGP peer down > 1m,
@@ -177,6 +318,24 @@ interface error-rate rising (`rate()`), route count anomaly, device unreachable.
 **Checkpoint:** why alert on `rate(errors)` not `errors`? What makes an alert *actionable*
 (the 2am test: what would you actually do)?
 
+**Config sketch** — `prometheus/alerts.yml` (exact metric names depend on your Phase-5 YANG
+paths — check yours in the Prometheus UI first):
+
+```yaml
+groups:
+  - name: network
+    rules:
+      - alert: DeviceUnreachable
+        expr: up == 0
+        for: 2m
+      - alert: InterfaceErrorsRising
+        expr: rate(interfaces_interface_state_counters_in_errors[5m]) > 1
+        for: 5m
+```
+
+Plus an `alertmanager` service in the compose file and `alerting:` + `rule_files:` stanzas in
+`prometheus.yml`.
+
 ## Phase 7 — Capstone: comparison + automation tie-in *(planned)*
 
 **Objective:** write the SNMP vs streaming-telemetry trade-off table from your own evidence
@@ -185,6 +344,17 @@ Stage 6: expose `check_bgp.py`-style results as Prometheus metrics (textfile exp
 scripted checks and telemetry land on one dashboard. Stretch: syslog → Grafana Loki.
 **Checkpoint:** when is SNMP still the right answer in 2026? What belongs in a check script
 vs a telemetry subscription?
+
+**Config sketch** — the automation tie-in (textfile exporter pattern): `check_bgp.py` writes
+
+```
+network_check_bgp_established{peer="2.2.2.2",device="R1"} 1
+```
+
+to `/var/lib/node_exporter/textfile/bgp.prom`; a `node-exporter` container runs with
+`--collector.textfile.directory=/var/lib/node_exporter/textfile`; Prometheus scrapes it. Your
+scripts and your telemetry now land on the same dashboards — comparison table cells fill from
+both.
 
 ---
 

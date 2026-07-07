@@ -34,6 +34,14 @@ Nothing run yet. `stack/`, `configs/`, `notes/` folders not created — make the
   polling-gap blindness, the two things that explain "weird graphs" at work.
 - Ties to `Automation/ROADMAP.md` Stage 6 — the textfile-exporter tie-in belongs there too.
 
+## Phase 3.8 (NetFlow) notes
+
+- Added on request — work NOCs run NfSen; lab uses **nfdump/nfcapd** directly (NfSen's web UI is
+  ancient PHP; optional). Modern alternatives to mention in the capstone: Akvorado, ElastiFlow.
+- Verify **XRv9000 24.3.1 sampled-NetFlow support/licensing** before building — virtual XR
+  platforms sometimes restrict flow features; if blocked, do the phase with `nfdump` reading
+  flows from an Ubuntu VM running softflowd on a mirrored link instead.
+
 ## Push to GitHub
 
 Repo: `bosamart/network-telemetry-lab` (**public**, pushed early as portfolio/reading copy via
