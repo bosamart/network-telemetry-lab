@@ -13,7 +13,12 @@ your PC — the same unblock the Automation track needs. One cable, two tracks.
 zero extra EVE-NG resources. The Ubuntu-VM-inside-EVE-NG variant (per the Linux lab design)
 is a later swap; the configs are identical either way.
 
-**Build status:** Phase 1 paste-ready. Phases 2–7 planned — fill one per session.
+**Build status:** Phase 1 paste-ready. Phases 2–7 planned (each has a config sketch) — full
+paste blocks get filled one per session.
+
+> **New to monitoring? Start with [docs/00-monitoring-concepts.md](docs/00-monitoring-concepts.md)**
+> — pull vs push, counters vs gauges, what SNMP/Cacti/NetFlow/gNMI/Prometheus each actually do,
+> and a glossary. The phases assume you've read it.
 
 ---
 
@@ -360,6 +365,7 @@ both.
 
 ## Files
 
+- `docs/` — beginner-friendly concept guides ([start here](docs/00-monitoring-concepts.md))
 - `stack/` — docker-compose + prometheus/gnmic/alertmanager configs (created as phases build)
 - `configs/` — router deltas per phase (`! Phase N:` markers)
 - `notes/` — verification logs per phase (paste real output, including PromQL used)
