@@ -1,3 +1,6 @@
+# ── Internal working files — never published ────────────────────
+HANDOFF.md
+
 # ── Private files — never published ─────────────────────────────
 # Convention: name it *.private.* (e.g. notes.private.md) or put it
 # in a private/ folder, and git will never push it.
