@@ -2,7 +2,7 @@
 
 Track 3 of the [Learning Roadmap](../../LEARNING-ROADMAP.md) as its own lab. The diamond gets
 watched: first the old way (SNMP polling), then the new way (gNMI streaming telemetry), landing
-in the same Prometheus + Grafana stack Telcotech runs. By the end you're building lab versions
+in the same Prometheus + Grafana stack many carriers/ISPs run. By the end you're building lab versions
 of the dashboards you watch at work — and you know what's behind every panel.
 
 **Platform:** XRv9000 ~24.3.1 diamond (shared topology, see [CLAUDE.md](../../CLAUDE.md)) +
@@ -29,7 +29,7 @@ paste blocks get filled one per session.
 | 1 | Monitoring stack up (Prometheus + Grafana in Docker) | ✅ paste-ready below |
 | 2 | SNMP baseline on IOS-XR | 🟡 planned |
 | 3 | snmp_exporter → first real dashboard | 🟡 planned |
-| 3.5 | Cacti — the legacy stack at work (Telcotech/Ezecom/Cellcard run it) | 🟡 planned |
+| 3.5 | Cacti — the legacy stack many NOCs still run | 🟡 planned |
 | 3.8 | NetFlow → nfdump/NfSen — *who/what* fills the links | 🟡 planned |
 | 4 | gNMI on IOS-XR + gnmic exploration | 🟡 planned |
 | 5 | Streaming telemetry pipeline + core dashboards | 🟡 planned |
@@ -187,7 +187,7 @@ exporter pattern made visible — understand these 8 lines and you understand it
 Phase 2, build interface graphs, then install the **Weathermap plugin** and draw the diamond —
 a mini version of the NOC wall map at work. Finish by graphing the *same* interface in Cacti and
 Grafana simultaneously and explaining every difference you see.
-**Why:** Telcotech/Ezecom/Cellcard run Cacti today. Debugging a wrong graph at work means
+**Why:** many carrier NOCs still run Cacti today. Debugging a wrong graph at work means
 knowing RRDtool underneath: polling interval vs resolution, **consolidation** (why last month's
 graph smooths away spikes — averages destroy microbursts), counter wraps showing as absurd
 spikes.
@@ -282,7 +282,7 @@ gnmic -a <R1-ip>:57400 -u admin -p admin --insecure \
 
 **Objective:** gnmic's built-in prometheus output (gnmic subscribes to routers, exposes
 metrics; Prometheus scrapes gnmic). Dashboards that mirror ops reality: BGP session state,
-IS-IS adjacencies, interface errors, CPU/memory. This is the lab version of your Telcotech
+IS-IS adjacencies, interface errors, CPU/memory. This is the lab version of the NOC's
 Grafana wall.
 **Verify:** break a BGP peer, watch the panel go red inside one sample interval.
 **Checkpoint:** trace one metric end-to-end: YANG leaf → gnmic → Prometheus metric+labels →

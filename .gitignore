@@ -23,10 +23,8 @@ inventory*.ini
 # ── Work-data safety net (labs are public; work stays sanitized) ─
 # Anything with a company name in the filename is blocked by default.
 # If a file is genuinely safe to publish, force it: git add -f <file>
-*telcotech*
-*ezecom*
-*cellcard*
-*metfone*
+*work-notes*
+*internal*
 
 # ── Junk ─────────────────────────────────────────────────────────
 __pycache__/
